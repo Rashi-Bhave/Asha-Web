@@ -1,27 +1,27 @@
-// Placeholder content for App.js// App.js - Main application component
+// App.js - Main application component
 import React, { useState, useEffect } from 'react';
 import { createContext, useContext } from 'react';
-import 'App.css';
+import './App.css';
 
 // Context Providers
-import { AuthProvider, AuthContext } from 'context/AuthContext';
-import { ChatProvider } from 'context/ChatContext';
+import { AuthProvider, AuthContext } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 
 // Components
-import Header from 'components/Header';
-import Sidebar from 'components/Sidebar';
-import ChatInterface from 'components/ChatInterface';
-import JobsPage from 'pages/JobsPage';
-import EventsPage from 'pages/EventsPage';
-import MentorshipPage from 'pages/MentorshipPage';
-import SettingsPage from 'pages/SettingsPage';
-import AboutPage from 'pages/AboutPage';
-import WelcomePage from 'pages/WelcomePage';
-import LoginPage from 'pages/LoginPage';
-import LoadingIndicator from 'components/LoadingIndicator';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import ChatInterface from './components/ChatInterface';
+import JobsPage from './pages/JobsPage';
+import EventsPage from './pages/EventsPage';
+import MentorshipPage from './pages/MentorshipPage';
+import SettingsPage from './pages/SettingsPage';
+import AboutPage from './pages/AboutPage';
+import WelcomePage from './pages/WelcomePage';
+import LoginPage from './pages/LoginPage';
+import LoadingIndicator from './components/LoadingIndicator';
 
 // Services
-import { isAuthenticated } from 'services/storageService';
+import { isAuthenticated } from './services/storageService';
 
 function App() {
   const [activeTab, setActiveTab] = useState('chat');

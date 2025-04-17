@@ -1,3 +1,4 @@
+// components/Sidebar.js
 import React from 'react';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
@@ -26,3 +27,5 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     </div>
   );
 };
+
+export default Sidebar;

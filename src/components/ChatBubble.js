@@ -1,6 +1,11 @@
 // components/ChatBubble.js
 import React, { useState } from 'react';
 
+// Import card components that were missing
+import JobCard from './JobCard';
+import EventCard from './EventCard';
+import MentorshipCard from './MentorshipCard';
+
 const ChatBubble = ({ message }) => {
   const [showActions, setShowActions] = useState(false);
   
@@ -83,3 +88,5 @@ const ChatBubble = ({ message }) => {
     </div>
   );
 };
+
+export default ChatBubble;
