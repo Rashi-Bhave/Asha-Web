@@ -1,6 +1,5 @@
 // App.js - Main application component
-import React, { useState, useEffect } from 'react';
-import { createContext, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './App.css';
 
 // Context Providers
@@ -24,6 +23,21 @@ import LoadingIndicator from './components/LoadingIndicator';
 // Services
 import { isAuthenticated } from './services/storageService';
 
+// Auth Consumer component to track authentication state changes
+const AuthStateManager = ({ setUserAuthenticated, setActiveTab }) => {
+  const { user, isAuthenticated } = useContext(AuthContext);
+  
+  useEffect(() => {
+    setUserAuthenticated(isAuthenticated);
+    // If user becomes authenticated, always set active tab to chat
+    if (isAuthenticated) {
+      setActiveTab('chat');
+    }
+  }, [isAuthenticated, setUserAuthenticated, setActiveTab]);
+  
+  return null;
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('chat');
   const [authChecked, setAuthChecked] = useState(false);
@@ -34,6 +48,10 @@ function App() {
       try {
         const authStatus = await isAuthenticated();
         setUserAuthenticated(authStatus);
+        // If user is authenticated on initial load, ensure we start on chat tab
+        if (authStatus) {
+          setActiveTab('chat');
+        }
       } catch (error) {
         console.error("Auth check failed:", error);
       } finally {
@@ -53,39 +71,38 @@ function App() {
     );
   }
 
-  // Render appropriate content based on authentication status
-  if (!userAuthenticated) {
-    return (
-      <AuthProvider>
-        <div className="app-container">
-          {activeTab === 'welcome' && <WelcomePage onNavigate={setActiveTab} />}
-          {activeTab === 'login' && <LoginPage onNavigate={setActiveTab} />}
-          {activeTab !== 'welcome' && activeTab !== 'login' && <WelcomePage onNavigate={setActiveTab} />}
-        </div>
-      </AuthProvider>
-    );
-  }
-
-  // If authenticated, render the main app interface
   return (
     <AuthProvider>
-      <ChatProvider>
-        <div className="app-container">
-          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
-          <div className="main-content">
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-            <div className="page-content">
-              {activeTab === 'chat' && <ChatInterface />}
-              {activeTab === 'jobs' && <JobsPage />}
-              {activeTab === 'events' && <EventsPage />}
-              {activeTab === 'mentorship' && <MentorshipPage />}
-              {activeTab === 'settings' && <SettingsPage onNavigate={setActiveTab} />}
-              {activeTab === 'profile' && <ProfilePage onNavigate={setActiveTab} />}
-              {activeTab === 'about' && <AboutPage />}
+      <AuthStateManager 
+        setUserAuthenticated={setUserAuthenticated} 
+        setActiveTab={setActiveTab}
+      />
+      
+      <div className="app-container">
+        {!userAuthenticated ? (
+          <>
+            {activeTab === 'welcome' && <WelcomePage onNavigate={setActiveTab} />}
+            {activeTab === 'login' && <LoginPage onNavigate={setActiveTab} />}
+            {activeTab !== 'welcome' && activeTab !== 'login' && <WelcomePage onNavigate={setActiveTab} />}
+          </>
+        ) : (
+          <ChatProvider>
+            <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+            <div className="main-content">
+              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+              <div className="page-content">
+                {activeTab === 'chat' && <ChatInterface />}
+                {activeTab === 'jobs' && <JobsPage />}
+                {activeTab === 'events' && <EventsPage />}
+                {activeTab === 'mentorship' && <MentorshipPage />}
+                {activeTab === 'settings' && <SettingsPage onNavigate={setActiveTab} />}
+                {activeTab === 'profile' && <ProfilePage onNavigate={setActiveTab} />}
+                {activeTab === 'about' && <AboutPage />}
+              </div>
             </div>
-          </div>
-        </div>
-      </ChatProvider>
+          </ChatProvider>
+        )}
+      </div>
     </AuthProvider>
   );
 }

@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { sanitizeInput } from '../services/encryptionService';
 
 const LoginPage = ({ onNavigate }) => {
-  const { login, register, loading, isAuthenticated } = useContext(AuthContext);
+  const { login, register, loading, isAuthenticated, user } = useContext(AuthContext);
   
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -12,13 +12,19 @@ const LoginPage = ({ onNavigate }) => {
   const [name, setName] = useState('');
   const [errors, setErrors] = useState({});
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [redirecting, setRedirecting] = useState(false);
   
   // Redirect to chat page if authentication is successful
   useEffect(() => {
-    if (isAuthenticated) {
-      onNavigate('chat');
+    if (isAuthenticated && user) {
+      setRedirecting(true);
+      // Force navigation to chat after a short delay
+      const timer = setTimeout(() => {
+        onNavigate('chat');
+      }, 1500);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, onNavigate]);
+  }, [isAuthenticated, user, onNavigate]);
   
   const validateForm = () => {
     const newErrors = {};
@@ -55,7 +61,7 @@ const LoginPage = ({ onNavigate }) => {
     
     try {
       if (isLogin) {
-        // Login
+        // Login attempt
         const result = await login(sanitizeInput(email), password);
         if (!result.success) {
           setNotification({ 
@@ -63,9 +69,20 @@ const LoginPage = ({ onNavigate }) => {
             message: result.error || 'Invalid email or password. Please try again.', 
             type: 'error' 
           });
+        } else {
+          // Show success message
+          setNotification({
+            show: true,
+            message: 'Login successful! Redirecting to dashboard...',
+            type: 'success'
+          });
+          // Force redirection - better handling for any state issues
+          setTimeout(() => {
+            onNavigate('chat');
+          }, 1000);
         }
       } else {
-        // Register
+        // Register attempt
         const userData = {
           name: sanitizeInput(name),
           email: sanitizeInput(email),
@@ -80,12 +97,16 @@ const LoginPage = ({ onNavigate }) => {
             type: 'error' 
           });
         } else {
-          // Show success notification and redirect will happen via useEffect
+          // Show success notification
           setNotification({
             show: true,
             message: 'Account created successfully! Redirecting to dashboard...',
             type: 'success'
           });
+          // Force redirection - better handling for any state issues
+          setTimeout(() => {
+            onNavigate('chat');
+          }, 1000);
         }
       }
     } catch (error) {
@@ -106,6 +127,15 @@ const LoginPage = ({ onNavigate }) => {
   const handleBack = () => {
     onNavigate('welcome');
   };
+  
+  if (redirecting) {
+    return (
+      <div className="app-loading">
+        <div className="loader"></div>
+        <p>Redirecting to chat...</p>
+      </div>
+    );
+  }
   
   return (
     <div className="login-page">

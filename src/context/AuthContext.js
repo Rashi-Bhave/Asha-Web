@@ -3,7 +3,14 @@ import React, { createContext, useState, useEffect } from 'react';
 
 // Services
 import { getUserProfile, loginUser, registerUser, logoutUser } from '../api/index';
-import { saveAuthToken, getAuthToken, removeAuthToken } from '../services/storageService';
+import { 
+  saveAuthToken, 
+  getAuthToken, 
+  removeAuthToken, 
+  saveUserData, 
+  getUserData, 
+  clearAllStorage 
+} from '../services/storageService';
 
 export const AuthContext = createContext();
 
@@ -21,12 +28,22 @@ export const AuthProvider = ({ children }) => {
         if (token) {
           // Fetch user profile with token
           const userProfile = await getUserProfile();
-          setUser(userProfile);
+          if (userProfile) {
+            setUser(userProfile);
+            // Also save user data to storage for persistence
+            await saveUserData(userProfile);
+          }
+        } else {
+          // Try to get user from storage as fallback
+          const storedUser = await getUserData();
+          if (storedUser) {
+            setUser(storedUser);
+          }
         }
       } catch (e) {
         console.error('Authentication error:', e);
-        // Clear invalid token
-        await removeAuthToken();
+        // Clear invalid token and data
+        await clearAllStorage();
       } finally {
         setLoading(false);
       }
@@ -48,7 +65,10 @@ export const AuthProvider = ({ children }) => {
       // Set user data
       setUser(response.user);
       
-      return { success: true };
+      // Also save user data to storage
+      await saveUserData(response.user);
+      
+      return { success: true, user: response.user };
     } catch (e) {
       console.error('Login error:', e);
       setError(e.message || 'Invalid email or password. Please try again.');
@@ -71,7 +91,10 @@ export const AuthProvider = ({ children }) => {
       // Set user data
       setUser(response.user);
       
-      return { success: true };
+      // Also save user data to storage
+      await saveUserData(response.user);
+      
+      return { success: true, user: response.user };
     } catch (e) {
       console.error('Registration error:', e);
       setError(e.message || 'Registration failed. This email may already be in use.');
@@ -85,11 +108,13 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     
     try {
-      // Call logout API if needed
+      // Call logout API
       await logoutUser();
       
-      // Clear auth token and user data
-      await removeAuthToken();
+      // Clear all stored data
+      await clearAllStorage();
+      
+      // Clear user state
       setUser(null);
       
       return { success: true };
@@ -108,6 +133,9 @@ export const AuthProvider = ({ children }) => {
       // Would call API to update profile
       const updatedUser = { ...user, ...updatedData };
       setUser(updatedUser);
+      
+      // Also update in storage
+      await saveUserData(updatedUser);
       
       return { success: true };
     } catch (e) {

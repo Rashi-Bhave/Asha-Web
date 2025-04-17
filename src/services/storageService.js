@@ -1,4 +1,3 @@
-// Placeholder content for storageService.js// 
 // services/storageService.js - Web Storage implementation
 import { encryptData, decryptData } from './encryptionService';
 
@@ -20,6 +19,9 @@ const SAVED_MENTORSHIPS_KEY = 'asha_saved_mentorships';
  */
 export const saveAuthToken = async (token) => {
   try {
+    if (!token) {
+      return false;
+    }
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     return true;
   } catch (error) {
@@ -65,6 +67,9 @@ export const removeAuthToken = async () => {
  */
 export const saveUserData = async (userData) => {
   try {
+    if (!userData) {
+      return false;
+    }
     const encryptedData = encryptData(JSON.stringify(userData));
     localStorage.setItem(USER_DATA_KEY, encryptedData);
     return true;
@@ -100,7 +105,11 @@ export const getUserData = async () => {
 export const isAuthenticated = async () => {
   try {
     const token = await getAuthToken();
-    return !!token;
+    if (!token) return false;
+    
+    // Additional check - make sure we have user data too
+    const userData = await getUserData();
+    return !!(token && userData);
   } catch (error) {
     console.error('Error checking authentication:', error);
     return false;
@@ -252,5 +261,3 @@ export const clearAllStorage = async () => {
     return false;
   }
 };
-
-// services/encryptionService.js - Web implementation
