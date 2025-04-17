@@ -1,10 +1,10 @@
-// Placeholder content for LoginPage.js
-import React, { useState, useContext } from 'react';
+// pages/LoginPage.js
+import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { sanitizeInput } from '../services/encryptionService';
 
 const LoginPage = ({ onNavigate }) => {
-  const { login, register, skipAuth, loading } = useContext(AuthContext);
+  const { login, register, loading, isAuthenticated } = useContext(AuthContext);
   
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -12,6 +12,13 @@ const LoginPage = ({ onNavigate }) => {
   const [name, setName] = useState('');
   const [errors, setErrors] = useState({});
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  
+  // Redirect to chat page if authentication is successful
+  useEffect(() => {
+    if (isAuthenticated) {
+      onNavigate('chat');
+    }
+  }, [isAuthenticated, onNavigate]);
   
   const validateForm = () => {
     const newErrors = {};
@@ -53,7 +60,7 @@ const LoginPage = ({ onNavigate }) => {
         if (!result.success) {
           setNotification({ 
             show: true, 
-            message: result.error || 'Login failed', 
+            message: result.error || 'Invalid email or password. Please try again.', 
             type: 'error' 
           });
         }
@@ -69,15 +76,22 @@ const LoginPage = ({ onNavigate }) => {
         if (!result.success) {
           setNotification({ 
             show: true, 
-            message: result.error || 'Registration failed', 
+            message: result.error || 'Registration failed. This email may already be in use.', 
             type: 'error' 
+          });
+        } else {
+          // Show success notification and redirect will happen via useEffect
+          setNotification({
+            show: true,
+            message: 'Account created successfully! Redirecting to dashboard...',
+            type: 'success'
           });
         }
       }
     } catch (error) {
       setNotification({ 
         show: true, 
-        message: error.message || 'An error occurred', 
+        message: error.message || 'An error occurred. Please try again.', 
         type: 'error' 
       });
     }
@@ -86,6 +100,7 @@ const LoginPage = ({ onNavigate }) => {
   const toggleMode = () => {
     setIsLogin(!isLogin);
     setErrors({});
+    setNotification({ show: false, message: '', type: '' });
   };
   
   const handleBack = () => {
@@ -109,6 +124,18 @@ const LoginPage = ({ onNavigate }) => {
               : 'Join Asha AI and start your career growth journey'}
           </p>
         </div>
+        
+        {notification.show && (
+          <div className={`notification ${notification.type}`}>
+            {notification.message}
+            <button 
+              className="notification-close" 
+              onClick={() => setNotification({ ...notification, show: false })}
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+        )}
         
         <form className="login-form" onSubmit={handleSubmit}>
           {!isLogin && (
@@ -192,32 +219,7 @@ const LoginPage = ({ onNavigate }) => {
                 : "Already have an account? Sign in"}
             </button>
           </div>
-          
-          <div className="form-divider">
-            <span>or</span>
-          </div>
-          
-          <button 
-            type="button"
-            className="skip-button"
-            onClick={skipAuth}
-            disabled={loading}
-          >
-            Skip for now
-          </button>
         </form>
-        
-        {notification.show && (
-          <div className={`notification ${notification.type}`}>
-            {notification.message}
-            <button 
-              className="notification-close" 
-              onClick={() => setNotification({ ...notification, show: false })}
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     { id: 'jobs', label: 'Jobs', icon: 'fa-briefcase' },
     { id: 'events', label: 'Events', icon: 'fa-calendar' },
     { id: 'mentorship', label: 'Mentorship', icon: 'fa-users' },
+    { id: 'profile', label: 'Profile', icon: 'fa-user' },
     { id: 'settings', label: 'Settings', icon: 'fa-cog' },
   ];
 

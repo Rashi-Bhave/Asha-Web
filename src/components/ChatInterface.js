@@ -1,4 +1,3 @@
-// Placeholder content for ChatInterface.js
 // components/ChatInterface.js
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { ChatContext } from '../context/ChatContext';
@@ -116,3 +115,5 @@ const ChatInterface = () => {
     </div>
   );
 };
+
+export default ChatInterface;

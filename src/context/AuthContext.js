@@ -1,4 +1,4 @@
-// Placeholder content for AuthContext.js// context/AuthContext.js
+// context/AuthContext.js
 import React, { createContext, useState, useEffect } from 'react';
 
 // Services
@@ -51,8 +51,8 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (e) {
       console.error('Login error:', e);
-      setError(e.message || 'An error occurred during login.');
-      return { success: false, error: e.message || 'Login failed' };
+      setError(e.message || 'Invalid email or password. Please try again.');
+      return { success: false, error: e.message || 'Invalid email or password. Please try again.' };
     } finally {
       setLoading(false);
     }
@@ -74,8 +74,8 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (e) {
       console.error('Registration error:', e);
-      setError(e.message || 'An error occurred during registration.');
-      return { success: false, error: e.message || 'Registration failed' };
+      setError(e.message || 'Registration failed. This email may already be in use.');
+      return { success: false, error: e.message || 'Registration failed. This email may already be in use.' };
     } finally {
       setLoading(false);
     }
@@ -119,27 +119,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
-  // Skip actual authentication for demo purposes
-  const skipAuth = async () => {
-    setLoading(true);
-    
-    // Create a demo user
-    const demoUser = {
-      id: 'demo-user-123',
-      name: 'Demo User',
-      email: 'demo@example.com',
-      profilePicture: null,
-    };
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setUser(demoUser);
-    setLoading(false);
-    
-    return { success: true };
-  };
-  
   return (
     <AuthContext.Provider
       value={{
@@ -150,7 +129,6 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         updateUserProfile,
-        skipAuth,
         isAuthenticated: !!user,
       }}
     >
@@ -158,5 +136,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-// context/ChatContext.js

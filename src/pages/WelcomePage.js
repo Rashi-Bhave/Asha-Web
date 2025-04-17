@@ -1,16 +1,9 @@
-// Placeholder content for WelcomePage.js// pages/WelcomePage.js
-import React, { useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
+// pages/WelcomePage.js
+import React from 'react';
 
 const WelcomePage = ({ onNavigate }) => {
-  const { skipAuth } = useContext(AuthContext);
-  
   const handleLogin = () => {
     onNavigate('login');
-  };
-  
-  const handleSkip = async () => {
-    await skipAuth();
   };
   
   const featureItems = [
@@ -68,10 +61,6 @@ const WelcomePage = ({ onNavigate }) => {
           <button className="welcome-button" onClick={handleLogin}>
             Sign In / Create Account
           </button>
-          
-          <button className="skip-link" onClick={handleSkip}>
-            Skip for now
-          </button>
         </div>
         
         <div className="welcome-footer">
@@ -84,4 +73,4 @@ const WelcomePage = ({ onNavigate }) => {
   );
 };
 
-// pages/LoginPage.js
+export default WelcomePage;

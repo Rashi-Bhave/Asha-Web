@@ -15,6 +15,7 @@ import JobsPage from './pages/JobsPage';
 import EventsPage from './pages/EventsPage';
 import MentorshipPage from './pages/MentorshipPage';
 import SettingsPage from './pages/SettingsPage';
+import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
@@ -78,7 +79,8 @@ function App() {
               {activeTab === 'jobs' && <JobsPage />}
               {activeTab === 'events' && <EventsPage />}
               {activeTab === 'mentorship' && <MentorshipPage />}
-              {activeTab === 'settings' && <SettingsPage />}
+              {activeTab === 'settings' && <SettingsPage onNavigate={setActiveTab} />}
+              {activeTab === 'profile' && <ProfilePage onNavigate={setActiveTab} />}
               {activeTab === 'about' && <AboutPage />}
             </div>
           </div>

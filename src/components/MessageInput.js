@@ -1,4 +1,4 @@
-// Placeholder content for MessageInput.js
+// components/MessageInput.js
 import React, { useState, useRef, useEffect } from 'react';
 
 const MessageInput = ({ value, onChange, onSend, disabled }) => {
@@ -56,3 +56,5 @@ const MessageInput = ({ value, onChange, onSend, disabled }) => {
     </div>
   );
 };
+
+export default MessageInput;
