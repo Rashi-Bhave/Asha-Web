@@ -1,7 +1,9 @@
 // src/pages/JobsPage.js
 import React, { useState, useEffect } from 'react';
 import { fetchJobs } from '../api/jobsApi';
-import "./JobsPage.css"
+import ApiTester from '../components/ApiTester';
+import "./JobsPage.css";
+
 const JobsPage = () => {
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
@@ -10,6 +12,7 @@ const JobsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState([]);
+  const [showApiTester, setShowApiTester] = useState(false); // For development/admin use
   const [filters, setFilters] = useState({
     location: [],
     type: [],
@@ -53,7 +56,22 @@ const JobsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const fetchedJobs = await fetchJobs();
+      
+      // Create filters object from current state
+      const apiFilters = {
+        search: searchQuery,
+        ...Object.entries(filters).reduce((acc, [key, values]) => {
+          if (values.length === 1) {
+            acc[key] = values[0];
+          }
+          return acc;
+        }, {})
+      };
+      
+      console.log('Fetching jobs with filters:', apiFilters);
+      const fetchedJobs = await fetchJobs(apiFilters);
+      console.log(`Received ${fetchedJobs.length} jobs from API`);
+      
       setJobs(fetchedJobs);
       setFilteredJobs(fetchedJobs);
       setLoading(false);
@@ -65,6 +83,8 @@ const JobsPage = () => {
   };
 
   const applyFilters = () => {
+    if (!jobs.length) return;
+    
     let result = [...jobs];
     
     // Apply search query
@@ -84,7 +104,7 @@ const JobsPage = () => {
     if (filters.location.length > 0) {
       result = result.filter((job) => 
         filters.location.some(loc => 
-          job.location.toLowerCase().includes(loc.toLowerCase())
+          job.location && job.location.toLowerCase().includes(loc.toLowerCase())
         )
       );
     }
@@ -93,7 +113,7 @@ const JobsPage = () => {
     if (filters.type.length > 0) {
       result = result.filter((job) => 
         filters.type.some(type => 
-          job.type.toLowerCase().includes(type.toLowerCase())
+          job.type && job.type.toLowerCase().includes(type.toLowerCase())
         )
       );
     }
@@ -154,11 +174,15 @@ const JobsPage = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // Search is actually applied in the useEffect via applyFilters
+    loadJobs(); // Reload jobs with the new search query
   };
 
   const handleRefresh = () => {
     loadJobs();
+  };
+
+  const toggleApiTester = () => {
+    setShowApiTester(!showApiTester);
   };
 
   const renderFilterCategory = (category, title) => {
@@ -267,12 +291,12 @@ const JobsPage = () => {
           <div className="card-details">
             <div className="card-detail-item">
               <i className="fas fa-map-marker-alt"></i>
-              <span className="card-detail-text">{job.location || 'Remote'}</span>
+              <span className="card-detail-text">{job.location || 'Location not specified'}</span>
             </div>
             
             <div className="card-detail-item">
               <i className="fas fa-briefcase"></i>
-              <span className="card-detail-text">{job.type || 'Full-time'}</span>
+              <span className="card-detail-text">{job.type || 'Job type not specified'}</span>
             </div>
             
             <div className="card-detail-item">
@@ -290,7 +314,7 @@ const JobsPage = () => {
             )}
           </div>
           
-          {job.salary && job.salary !== 'Not specified' && (
+          {job.salary && job.salary !== 'Not specified' && job.salary !== 'Salary not specified' && (
             <div className="card-salary">
               <i className="fas fa-money-bill-wave"></i> {job.salary}
             </div>
@@ -305,7 +329,7 @@ const JobsPage = () => {
           <p className="card-description">
             {job.description && job.description.length > 200
               ? `${job.description.substring(0, 200)}...`
-              : job.description}
+              : job.description || 'No description available'}
           </p>
         </div>
         
@@ -346,15 +370,24 @@ const JobsPage = () => {
     if (error) {
       return (
         <div className="error-state">
-          <i className="fas fa-exclamation-circle"></i>
+          <i className="fas fa-exclamation-circle error-icon"></i>
           <h2 className="error-title">Oops! Something went wrong</h2>
           <p className="error-text">{error}</p>
-          <button 
-            className="primary-button"
-            onClick={handleRefresh}
-          >
-            <i className="fas fa-sync"></i> Try Again
-          </button>
+          <div className="error-actions">
+            <button 
+              className="primary-button"
+              onClick={handleRefresh}
+            >
+              <i className="fas fa-sync"></i> Try Again
+            </button>
+            
+            <button 
+              className="secondary-button"
+              onClick={toggleApiTester}
+            >
+              <i className="fas fa-wrench"></i> Debug API Connection
+            </button>
+          </div>
         </div>
       );
     }
@@ -389,6 +422,9 @@ const JobsPage = () => {
         </p>
       </div>
       
+      {/* API Tester (hidden by default, can be shown when debugging) */}
+      {showApiTester && <ApiTester />}
+      
       <div className="search-filter-container">
         <form onSubmit={handleSearch} className="search-form">
           <div className="search-container">
@@ -421,6 +457,18 @@ const JobsPage = () => {
             <i className={`fas fa-sync ${loading ? 'fa-spin' : ''}`}></i>
             <span>Refresh</span>
           </button>
+          
+          {/* Hidden debug button - only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              className="refresh-button"
+              onClick={toggleApiTester}
+              style={{ marginLeft: '8px' }}
+            >
+              <i className="fas fa-wrench"></i>
+              <span>Debug</span>
+            </button>
+          )}
         </div>
       </div>
       
@@ -471,24 +519,29 @@ const JobsPage = () => {
 const formatDate = (dateString) => {
   if (!dateString) return 'Recently';
   
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) {
-    return 'Today';
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else if (diffDays < 30) {
-    return `${Math.floor(diffDays / 7)} weeks ago`;
-  } else {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else if (diffDays < 30) {
+      return `${Math.floor(diffDays / 7)} weeks ago`;
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return 'Recently';
   }
 };
 

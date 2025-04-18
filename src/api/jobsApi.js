@@ -4,8 +4,8 @@ import api from './index';
 
 // Adzuna API credentials
 // Note: In a production environment, these should be environment variables
-const ADZUNA_APP_ID = '0fe0ceef'; // Replace with your Adzuna App ID
-const ADZUNA_API_KEY = '57c6062c92b59ed17b32aec4e2e83b8f'; // Replace with your Adzuna API Key
+const ADZUNA_APP_ID = '0fe0ceef'; 
+const ADZUNA_API_KEY = '57c6062c92b59ed17b32aec4e2e83b8f'; 
 
 // Base URL for Adzuna API
 const ADZUNA_BASE_URL = 'https://api.adzuna.com/v1/api';
@@ -24,63 +24,69 @@ export const fetchJobs = async (filters = {}) => {
       return fetchMockJobs(filters);
     }
 
+    console.log('Fetching jobs from Adzuna API with filters:', filters);
+
     // Set up query parameters for the API call
     const params = {
       app_id: ADZUNA_APP_ID,
       app_key: ADZUNA_API_KEY,
       results_per_page: 10, // Number of results to return per page
-      what: filters.search || '', // Job title, keywords, or company name
-      where: filters.location || '', // Location
-      // Additional parameters based on filters
-      full_time: filters.type === 'Full-time' ? 1 : 0,
-      part_time: filters.type === 'Part-time' ? 1 : 0,
-      contract: filters.type === 'Contract' ? 1 : 0,
+      content_type: 'application/json' // Explicitly request JSON response
     };
 
-    // Make the API call to Adzuna
-    const response = await axios.get(`${ADZUNA_BASE_URL}/jobs/in/country/search/1`, { params });
+    // Add search query if provided
+    if (filters.search) {
+      params.what = filters.search; // Job title, keywords, or company name
+    }
+
+    // Add location if provided
+    if (filters.location) {
+      params.where = filters.location;
+    }
+
+    // Add job type filters if provided
+    if (filters.type) {
+      if (filters.type === 'Full-time') params.full_time = 1;
+      if (filters.type === 'Part-time') params.part_time = 1;
+      if (filters.type === 'Contract') params.contract = 1;
+    }
+
+    // Use 'gb' (Great Britain) as the default country code
+    // In a production app, this could be configurable or based on user's location
+    const countryCode = 'gb';
     
-    // Transform the response data to match our job structure
-    const jobs = response.data.results.map(job => transformAdzunaJob(job));
+    console.log(`Calling Adzuna API: ${ADZUNA_BASE_URL}/jobs/${countryCode}/search/1`);
+
+    // Make the API call to Adzuna with the correct URL format
+    const response = await axios.get(`${ADZUNA_BASE_URL}/jobs/${countryCode}/search/1`, { 
+      params,
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
     
-    return jobs;
+    console.log('Adzuna API response received:', response.status);
+    
+    if (response.data && response.data.results) {
+      // Transform the response data to match our job structure
+      const jobs = response.data.results.map(job => transformAdzunaJob(job));
+      return jobs;
+    } else {
+      console.warn('Unexpected response format from Adzuna API, falling back to mock data');
+      return fetchMockJobs(filters);
+    }
   } catch (error) {
     console.error('Error fetching jobs from Adzuna:', error);
-    // Fallback to mock data if API call fails
-    return fetchMockJobs(filters);
-  }
-};
-
-/**
- * Alternative implementation using a proxy server to avoid CORS issues
- * This requires setting up a proxy server or using a service like RapidAPI
- */
-export const fetchJobsViaProxy = async (filters = {}) => {
-  try {
-    // Example using a proxy service like RapidAPI
-    const options = {
-      method: 'GET',
-      url: 'https://jsearch.p.rapidapi.com/search',
-      params: {
-        query: filters.search || 'All jobs',
-        page: '1',
-        num_pages: '1',
-        location: filters.location || ''
-      },
-      headers: {
-        'X-RapidAPI-Key': 'YOUR_RAPIDAPI_KEY', // Replace with your RapidAPI key
-        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
-      }
-    };
-
-    const response = await axios.request(options);
+    // Show more detailed error information
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
     
-    // Transform the response data to match our job structure
-    const jobs = response.data.data.map(job => transformJSearchJob(job));
-    
-    return jobs;
-  } catch (error) {
-    console.error('Error fetching jobs via proxy:', error);
     // Fallback to mock data if API call fails
     return fetchMockJobs(filters);
   }
@@ -95,48 +101,20 @@ export const fetchJobsViaProxy = async (filters = {}) => {
 const transformAdzunaJob = (adzunaJob) => {
   return {
     id: adzunaJob.id,
-    title: adzunaJob.title,
-    company: adzunaJob.company.display_name,
-    location: adzunaJob.location.display_name,
+    title: adzunaJob.title || 'No Title Available',
+    company: adzunaJob.company?.display_name || 'Company Not Specified',
+    location: adzunaJob.location?.display_name || 'Location Not Specified',
     type: adzunaJob.contract_time || 'Full-time',
-    salary: adzunaJob.salary_is_predicted === 1 
-      ? `${adzunaJob.salary_min} - ${adzunaJob.salary_max} ${adzunaJob.salary_currency}`
+    salary: (adzunaJob.salary_min && adzunaJob.salary_max) 
+      ? `${adzunaJob.salary_min} - ${adzunaJob.salary_max} ${adzunaJob.salary_currency || ''}`
       : 'Salary not specified',
-    description: adzunaJob.description,
-    postedDate: new Date(adzunaJob.created).toISOString(),
-    applyUrl: adzunaJob.redirect_url,
+    description: adzunaJob.description || 'No description available',
+    postedDate: adzunaJob.created ? new Date(adzunaJob.created).toISOString() : new Date().toISOString(),
+    applyUrl: adzunaJob.redirect_url || '#',
     logo: 'https://via.placeholder.com/50', // Adzuna doesn't provide company logos
-    skills: extractSkillsFromDescription(adzunaJob.description),
-    experienceLevel: determineExperienceLevel(adzunaJob.title, adzunaJob.description),
-    industry: adzunaJob.category.label,
-  };
-};
-
-/**
- * Transform JSearch job data to match our application's structure
- * 
- * @param {Object} jSearchJob - Job data from JSearch API
- * @returns {Object} - Transformed job object
- */
-const transformJSearchJob = (jSearchJob) => {
-  return {
-    id: jSearchJob.job_id,
-    title: jSearchJob.job_title,
-    company: jSearchJob.employer_name,
-    location: jSearchJob.job_city + (jSearchJob.job_state ? `, ${jSearchJob.job_state}` : ''),
-    type: jSearchJob.job_employment_type || 'Full-time',
-    salary: jSearchJob.job_min_salary && jSearchJob.job_max_salary 
-      ? `${jSearchJob.job_min_salary} - ${jSearchJob.job_max_salary} ${jSearchJob.job_salary_currency || 'USD'}`
-      : 'Salary not specified',
-    description: jSearchJob.job_description,
-    postedDate: jSearchJob.job_posted_at_datetime_utc,
-    applyUrl: jSearchJob.job_apply_link,
-    logo: jSearchJob.employer_logo || 'https://via.placeholder.com/50',
-    skills: extractSkillsFromDescription(jSearchJob.job_description),
-    experienceLevel: jSearchJob.job_required_experience?.required_experience_in_months 
-      ? convertMonthsToExperienceLevel(jSearchJob.job_required_experience.required_experience_in_months)
-      : 'Not specified',
-    industry: jSearchJob.job_job_category || 'Not specified',
+    skills: extractSkillsFromDescription(adzunaJob.description || ''),
+    experienceLevel: determineExperienceLevel(adzunaJob.title || '', adzunaJob.description || ''),
+    industry: adzunaJob.category?.label || 'Not specified',
   };
 };
 
@@ -198,24 +176,6 @@ const determineExperienceLevel = (title, description) => {
     return 'Entry Level';
   } else {
     return 'Mid Level';
-  }
-};
-
-/**
- * Convert months of experience to experience level
- * 
- * @param {number} months - Months of experience
- * @returns {string} - Experience level
- */
-const convertMonthsToExperienceLevel = (months) => {
-  if (!months || months < 0) return 'Not specified';
-  
-  if (months < 24) {
-    return 'Entry Level';
-  } else if (months < 60) {
-    return 'Mid Level';
-  } else {
-    return 'Senior Level';
   }
 };
 
@@ -386,6 +346,8 @@ const fetchMockJobs = async (filters = {}) => {
     }
   ];
   
+  console.log('Using mock job data with filters:', filters);
+  
   // Apply filters if provided
   let filteredJobs = [...jobs];
   
@@ -428,6 +390,5 @@ const fetchMockJobs = async (filters = {}) => {
 
 // Export the functions
 export default {
-  fetchJobs,
-  fetchJobsViaProxy
+  fetchJobs
 };
