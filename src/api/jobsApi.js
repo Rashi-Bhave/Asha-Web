@@ -1,121 +1,181 @@
 // src/api/jobsApi.js
 import axios from 'axios';
-import api from './index';
 
-// Adzuna API credentials
-// Note: In a production environment, these should be environment variables
-const ADZUNA_APP_ID = '0fe0ceef'; 
-const ADZUNA_API_KEY = '57c6062c92b59ed17b32aec4e2e83b8f'; 
-
-// Base URL for Adzuna API
-const ADZUNA_BASE_URL = 'https://api.adzuna.com/v1/api';
+// RapidAPI credentials
+const JSEARCH_API_KEY = 'd74d0dd574mshdff9d071b829b95p1201bcjsn0003797587f6';
+const JSEARCH_API_HOST = 'jsearch.p.rapidapi.com';
 
 /**
- * Fetches jobs from the Adzuna API
+ * Fetches jobs from the JSearch API (RapidAPI)
  * 
  * @param {Object} filters - Optional filters to apply
  * @returns {Array} - Array of job objects
  */
 export const fetchJobs = async (filters = {}) => {
   try {
-    // If API keys are not set, use mock data (for development/demo)
-    if (!ADZUNA_APP_ID || ADZUNA_APP_ID === 'YOUR_APP_ID' || !ADZUNA_API_KEY || ADZUNA_API_KEY === 'YOUR_API_KEY') {
-      console.warn('Adzuna API credentials not set. Using mock data instead.');
-      return fetchMockJobs(filters);
-    }
-
-    console.log('Fetching jobs from Adzuna API with filters:', filters);
-
-    // Set up query parameters for the API call
-    const params = {
-      app_id: ADZUNA_APP_ID,
-      app_key: ADZUNA_API_KEY,
-      results_per_page: 10, // Number of results to return per page
-      content_type: 'application/json' // Explicitly request JSON response
+    console.log('Fetching jobs with filters:', filters);
+    
+    // Set up RapidAPI request for the search endpoint
+    const options = {
+      method: 'GET',
+      url: 'https://jsearch.p.rapidapi.com/search',
+      params: {
+        query: (filters.search || 'all jobs') + (filters.location ? ` in ${filters.location}` : ' in Bangalore'),
+        page: '1',
+        num_pages: '1'
+      },
+      headers: {
+        'X-RapidAPI-Key': JSEARCH_API_KEY,
+        'X-RapidAPI-Host': JSEARCH_API_HOST
+      }
     };
 
-    // Add search query if provided
-    if (filters.search) {
-      params.what = filters.search; // Job title, keywords, or company name
-    }
-
-    // Add location if provided
-    if (filters.location) {
-      params.where = filters.location;
-    }
-
-    // Add job type filters if provided
-    if (filters.type) {
-      if (filters.type === 'Full-time') params.full_time = 1;
-      if (filters.type === 'Part-time') params.part_time = 1;
-      if (filters.type === 'Contract') params.contract = 1;
-    }
-
-    // Use 'gb' (Great Britain) as the default country code
-    // In a production app, this could be configurable or based on user's location
-    const countryCode = 'gb';
+    console.log('Making API request with options:', options);
     
-    console.log(`Calling Adzuna API: ${ADZUNA_BASE_URL}/jobs/${countryCode}/search/1`);
-
-    // Make the API call to Adzuna with the correct URL format
-    const response = await axios.get(`${ADZUNA_BASE_URL}/jobs/${countryCode}/search/1`, { 
-      params,
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    const response = await axios.request(options);
+    console.log('API response received:', response.data);
     
-    console.log('Adzuna API response received:', response.status);
-    
-    if (response.data && response.data.results) {
+    if (response.data && response.data.data && Array.isArray(response.data.data)) {
       // Transform the response data to match our job structure
-      const jobs = response.data.results.map(job => transformAdzunaJob(job));
+      const jobs = response.data.data.map(job => transformJSearchJob(job));
+      console.log('Transformed jobs:', jobs.length);
       return jobs;
     } else {
-      console.warn('Unexpected response format from Adzuna API, falling back to mock data');
+      console.warn('API returned unexpected format:', response.data);
       return fetchMockJobs(filters);
     }
   } catch (error) {
-    console.error('Error fetching jobs from Adzuna:', error);
-    // Show more detailed error information
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
-    }
-    
+    console.error('Error fetching jobs from RapidAPI:', error.response || error);
     // Fallback to mock data if API call fails
     return fetchMockJobs(filters);
   }
 };
 
 /**
- * Transform Adzuna job data to match our application's structure
+ * Transform JSearch job data to match our application's structure
  * 
- * @param {Object} adzunaJob - Job data from Adzuna API
+ * @param {Object} jSearchJob - Job data from JSearch API
  * @returns {Object} - Transformed job object
  */
-const transformAdzunaJob = (adzunaJob) => {
+const transformJSearchJob = (jSearchJob) => {
+  // Extract skills from job description
+  const skillsList = extractSkillsFromDescription(jSearchJob.job_description || '');
+  
+  // Calculate posting date
+  const postedDate = jSearchJob.job_posted_at_datetime_utc 
+    ? new Date(jSearchJob.job_posted_at_datetime_utc).toISOString() 
+    : new Date().toISOString();
+  
+  // Determine experience level
+  let experienceLevel = 'Not specified';
+  if (jSearchJob.job_required_experience) {
+    const months = jSearchJob.job_required_experience.required_experience_in_months;
+    experienceLevel = convertMonthsToExperienceLevel(months);
+  } else if (jSearchJob.job_title) {
+    experienceLevel = determineExperienceLevel(jSearchJob.job_title, jSearchJob.job_description || '');
+  }
+
+  // Format salary information
+  let salary = 'Salary not specified';
+  if (jSearchJob.job_min_salary && jSearchJob.job_max_salary) {
+    const currency = jSearchJob.job_salary_currency || 'USD';
+    const formattedMin = formatSalary(jSearchJob.job_min_salary, currency);
+    const formattedMax = formatSalary(jSearchJob.job_max_salary, currency);
+    salary = `${formattedMin} - ${formattedMax} ${getLocalCurrency(currency)}`;
+  }
+
   return {
-    id: adzunaJob.id,
-    title: adzunaJob.title || 'No Title Available',
-    company: adzunaJob.company?.display_name || 'Company Not Specified',
-    location: adzunaJob.location?.display_name || 'Location Not Specified',
-    type: adzunaJob.contract_time || 'Full-time',
-    salary: (adzunaJob.salary_min && adzunaJob.salary_max) 
-      ? `${adzunaJob.salary_min} - ${adzunaJob.salary_max} ${adzunaJob.salary_currency || ''}`
-      : 'Salary not specified',
-    description: adzunaJob.description || 'No description available',
-    postedDate: adzunaJob.created ? new Date(adzunaJob.created).toISOString() : new Date().toISOString(),
-    applyUrl: adzunaJob.redirect_url || '#',
-    logo: 'https://via.placeholder.com/50', // Adzuna doesn't provide company logos
-    skills: extractSkillsFromDescription(adzunaJob.description || ''),
-    experienceLevel: determineExperienceLevel(adzunaJob.title || '', adzunaJob.description || ''),
-    industry: adzunaJob.category?.label || 'Not specified',
+    id: jSearchJob.job_id || `job-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    title: jSearchJob.job_title || 'Job Title Not Available',
+    company: jSearchJob.employer_name || 'Company Not Specified',
+    location: formatLocation(jSearchJob),
+    type: formatEmploymentType(jSearchJob.job_employment_type),
+    salary: salary,
+    description: jSearchJob.job_description || 'No description available',
+    postedDate: postedDate,
+    applyUrl: jSearchJob.job_apply_link || '#',
+    logo: jSearchJob.employer_logo || 'https://via.placeholder.com/50',
+    skills: skillsList,
+    experienceLevel: experienceLevel,
+    industry: jSearchJob.job_job_category || 'Not specified',
+    remoteJob: jSearchJob.job_is_remote || false
   };
+};
+
+/**
+ * Format the location from JSearch API response
+ */
+const formatLocation = (jSearchJob) => {
+  let location = '';
+  
+  if (jSearchJob.job_city) {
+    location = jSearchJob.job_city;
+  }
+  
+  if (jSearchJob.job_state) {
+    location += location ? `, ${jSearchJob.job_state}` : jSearchJob.job_state;
+  }
+  
+  if (jSearchJob.job_country) {
+    location += location ? `, ${jSearchJob.job_country}` : jSearchJob.job_country;
+  }
+  
+  if (!location && jSearchJob.job_is_remote) {
+    location = 'Remote';
+  } else if (!location) {
+    location = 'Location Not Specified';
+  }
+  
+  return location;
+};
+
+/**
+ * Format employment type from JSearch API
+ */
+const formatEmploymentType = (type) => {
+  if (!type) return 'Full-time';
+  
+  // Map API types to our display types
+  const typeMap = {
+    'FULLTIME': 'Full-time',
+    'PARTTIME': 'Part-time',
+    'CONTRACTOR': 'Contract',
+    'INTERN': 'Internship'
+  };
+  
+  return typeMap[type.toUpperCase()] || type;
+};
+
+/**
+ * Format salary number with appropriate formatting
+ */
+const formatSalary = (amount, currency) => {
+  if (!amount) return '';
+  
+  // Format for INR (₹)
+  if (currency === 'INR') {
+    if (amount >= 100000) {
+      return `₹${(amount / 100000).toFixed(1)}L`;
+    }
+    return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+  }
+  
+  // Default formatting (USD, etc)
+  return Math.round(amount).toLocaleString();
+};
+
+/**
+ * Get localized currency symbol
+ */
+const getLocalCurrency = (currency) => {
+  const currencyMap = {
+    'USD': '$',
+    'INR': '₹',
+    'EUR': '€',
+    'GBP': '£',
+  };
+  
+  return currencyMap[currency] || currency;
 };
 
 /**
@@ -176,6 +236,24 @@ const determineExperienceLevel = (title, description) => {
     return 'Entry Level';
   } else {
     return 'Mid Level';
+  }
+};
+
+/**
+ * Convert months of experience to experience level
+ * 
+ * @param {number} months - Months of experience
+ * @returns {string} - Experience level
+ */
+const convertMonthsToExperienceLevel = (months) => {
+  if (!months || months < 0) return 'Not specified';
+  
+  if (months < 24) {
+    return 'Entry Level';
+  } else if (months < 60) {
+    return 'Mid Level';
+  } else {
+    return 'Senior Level';
   }
 };
 
@@ -241,9 +319,9 @@ const fetchMockJobs = async (filters = {}) => {
     },
     {
       id: 4,
-      title: 'Data Analyst',
+      title: 'Software Engineer',
       company: 'DataWise Analytics',
-      location: 'Remote',
+      location: 'Bangalore',
       type: 'Full-time',
       salary: '₹10L - ₹15L per annum',
       description: 'Turn data into actionable insights for our organization. You will collect, process, and analyze data, create visualizations, and present findings to stakeholders to drive business decisions.',
@@ -268,85 +346,8 @@ const fetchMockJobs = async (filters = {}) => {
       skills: ['Product Management', 'Agile', 'User Stories', 'Market Research'],
       experienceLevel: 'Mid Level',
       industry: 'Technology',
-    },
-    {
-      id: 6,
-      title: 'Frontend Developer',
-      company: 'WebTech Solutions',
-      location: 'Remote',
-      type: 'Full-time',
-      salary: '₹12L - ₹18L per annum',
-      description: 'Join our team to build stunning web interfaces. You will work with design teams to implement responsive, accessible, and performant user interfaces using modern frontend technologies.',
-      postedDate: new Date(currentDate.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-      applyUrl: 'https://example.com/apply/6',
-      logo: 'https://randomuser.me/api/portraits/men/6.jpg',
-      skills: ['React', 'JavaScript', 'CSS', 'HTML', 'Redux'],
-      experienceLevel: 'Mid Level',
-      industry: 'Technology',
-    },
-    {
-      id: 7,
-      title: 'Human Resources Manager',
-      company: 'Global Enterprises',
-      location: 'Mumbai',
-      type: 'Full-time',
-      salary: '₹15L - ₹20L per annum',
-      description: 'Oversee all aspects of human resources management. You will develop HR strategies, manage recruitment, handle employee relations, implement training programs, and ensure compliance with labor laws.',
-      postedDate: new Date(currentDate.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-      applyUrl: 'https://example.com/apply/7',
-      logo: 'https://randomuser.me/api/portraits/women/7.jpg',
-      skills: ['Recruitment', 'Employee Relations', 'Training', 'Labor Laws'],
-      experienceLevel: 'Senior Level',
-      industry: 'Human Resources',
-    },
-    {
-      id: 8,
-      title: 'Financial Analyst',
-      company: 'Financial Insights Ltd',
-      location: 'Bangalore',
-      type: 'Full-time',
-      salary: '₹12L - ₹18L per annum',
-      description: 'Analyze financial data to guide business decisions. You will prepare financial reports, create forecasts, analyze market trends, and make recommendations to improve financial performance.',
-      postedDate: new Date(currentDate.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString(), // 4 days ago
-      applyUrl: 'https://example.com/apply/8',
-      logo: 'https://randomuser.me/api/portraits/men/8.jpg',
-      skills: ['Financial Modeling', 'Excel', 'Data Analysis', 'Reporting'],
-      experienceLevel: 'Mid Level',
-      industry: 'Finance',
-    },
-    {
-      id: 9,
-      title: 'DevOps Engineer',
-      company: 'Cloud Solutions Inc',
-      location: 'Remote',
-      type: 'Full-time',
-      salary: '₹18L - ₹25L per annum',
-      description: 'Streamline our development and operations processes. You will implement CI/CD pipelines, manage cloud infrastructure, optimize system performance, and ensure high availability of our applications.',
-      postedDate: new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-      applyUrl: 'https://example.com/apply/9',
-      logo: 'https://randomuser.me/api/portraits/men/9.jpg',
-      skills: ['AWS', 'Docker', 'Kubernetes', 'CI/CD', 'Linux'],
-      experienceLevel: 'Mid Level',
-      industry: 'Technology',
-    },
-    {
-      id: 10,
-      title: 'Content Writer',
-      company: 'Digital Media Hub',
-      location: 'Remote',
-      type: 'Contract',
-      salary: '₹50K - ₹70K per month',
-      description: 'Create engaging content for our digital platforms. You will research topics, write articles, blog posts, and social media content, and collaborate with editors to ensure high-quality publications.',
-      postedDate: new Date(currentDate.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days ago
-      applyUrl: 'https://example.com/apply/10',
-      logo: 'https://randomuser.me/api/portraits/women/10.jpg',
-      skills: ['Content Writing', 'SEO', 'Research', 'Editing'],
-      experienceLevel: 'Entry Level',
-      industry: 'Media & Communications',
     }
   ];
-  
-  console.log('Using mock job data with filters:', filters);
   
   // Apply filters if provided
   let filteredJobs = [...jobs];
@@ -367,24 +368,7 @@ const fetchMockJobs = async (filters = {}) => {
     );
   }
   
-  if (filters.type) {
-    filteredJobs = filteredJobs.filter((job) => 
-      job.type.toLowerCase() === filters.type.toLowerCase()
-    );
-  }
-  
-  if (filters.experienceLevel) {
-    filteredJobs = filteredJobs.filter((job) => 
-      job.experienceLevel.toLowerCase() === filters.experienceLevel.toLowerCase()
-    );
-  }
-
-  if (filters.industry) {
-    filteredJobs = filteredJobs.filter((job) => 
-      job.industry.toLowerCase().includes(filters.industry.toLowerCase())
-    );
-  }
-  
+  // Return filtered jobs
   return filteredJobs;
 };
 

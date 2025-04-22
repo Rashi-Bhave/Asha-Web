@@ -1,266 +1,124 @@
 // src/pages/JobsPage.js
 import React, { useState, useEffect } from 'react';
 import { fetchJobs } from '../api/jobsApi';
-import ApiTester from '../components/ApiTester';
-import "./JobsPage.css";
+import "./JobsPage.css"
 
 const JobsPage = () => {
   const [jobs, setJobs] = useState([]);
-  const [filteredJobs, setFilteredJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterVisible, setFilterVisible] = useState(false);
+  const [locationQuery, setLocationQuery] = useState('Bangalore');
   const [activeFilters, setActiveFilters] = useState([]);
-  const [showApiTester, setShowApiTester] = useState(false); // For development/admin use
-  const [filters, setFilters] = useState({
-    location: [],
-    type: [],
-    experience: [],
-    industry: []
-  });
+  const [apiStatus, setApiStatus] = useState({ show: false, message: '', type: '' });
 
-  // Available filter options
-  const filterOptions = {
-    location: ['Remote', 'Hybrid', 'On-site', 'Bangalore', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad'],
-    type: ['Full-time', 'Part-time', 'Contract', 'Internship', 'Freelance'],
-    experience: ['Entry Level', 'Mid Level', 'Senior Level', 'Executive'],
-    industry: ['Technology', 'Marketing & Advertising', 'Finance', 'Healthcare', 'Education', 'Manufacturing']
-  };
+  // Keep track of the current search parameters
+  const [searchParams, setSearchParams] = useState({
+    search: '',
+    location: 'Bangalore'
+  });
 
   useEffect(() => {
     loadJobs();
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [searchQuery, filters, jobs]);
-
+  // Update active filters whenever location changes
   useEffect(() => {
     // Calculate active filters for display
     const active = [];
-    Object.entries(filters).forEach(([category, values]) => {
-      values.forEach(value => {
-        active.push({
-          category,
-          value,
-          label: `${value}`,
-          id: `${category}-${value}`
-        });
+    
+    // Add location if set
+    if (locationQuery && locationQuery !== '') {
+      active.push({
+        category: 'location',
+        value: locationQuery,
+        label: `Location: ${locationQuery}`,
+        id: `location-${locationQuery}`
       });
-    });
+    }
+    
     setActiveFilters(active);
-  }, [filters]);
+  }, [locationQuery]);
 
   const loadJobs = async () => {
     try {
       setLoading(true);
       setError(null);
+      setApiStatus({ show: false, message: '', type: '' });
       
-      // Create filters object from current state
-      const apiFilters = {
+      // Save current search parameters
+      const currentParams = {
         search: searchQuery,
-        ...Object.entries(filters).reduce((acc, [key, values]) => {
-          if (values.length === 1) {
-            acc[key] = values[0];
-          }
-          return acc;
-        }, {})
+        location: locationQuery
       };
+      setSearchParams(currentParams);
       
-      console.log('Fetching jobs with filters:', apiFilters);
-      const fetchedJobs = await fetchJobs(apiFilters);
-      console.log(`Received ${fetchedJobs.length} jobs from API`);
+      console.log('Searching for jobs with params:', currentParams);
+      const fetchedJobs = await fetchJobs(currentParams);
       
       setJobs(fetchedJobs);
-      setFilteredJobs(fetchedJobs);
       setLoading(false);
+      
+      if (fetchedJobs.length === 0) {
+        // No jobs found but API call was successful
+        setApiStatus({
+          show: true,
+          message: 'No jobs found matching your criteria. Try a different search or location.',
+          type: 'info'
+        });
+      } else {
+        // Success with jobs
+        setApiStatus({
+          show: true,
+          message: `Found ${fetchedJobs.length} jobs matching your search.`,
+          type: 'success'
+        });
+        
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => {
+          setApiStatus(prev => ({ ...prev, show: false }));
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error loading jobs:', error);
       setError('Failed to load job listings. Please try again later.');
       setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    if (!jobs.length) return;
-    
-    let result = [...jobs];
-    
-    // Apply search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter((job) => 
-        job.title.toLowerCase().includes(query) ||
-        job.company.toLowerCase().includes(query) ||
-        job.description.toLowerCase().includes(query) ||
-        (job.skills && job.skills.some(skill => 
-          skill.toLowerCase().includes(query)
-        ))
-      );
-    }
-    
-    // Apply location filters
-    if (filters.location.length > 0) {
-      result = result.filter((job) => 
-        filters.location.some(loc => 
-          job.location && job.location.toLowerCase().includes(loc.toLowerCase())
-        )
-      );
-    }
-    
-    // Apply job type filters
-    if (filters.type.length > 0) {
-      result = result.filter((job) => 
-        filters.type.some(type => 
-          job.type && job.type.toLowerCase().includes(type.toLowerCase())
-        )
-      );
-    }
-    
-    // Apply experience level filters
-    if (filters.experience.length > 0) {
-      result = result.filter((job) => 
-        filters.experience.some(exp => 
-          job.experienceLevel && job.experienceLevel.toLowerCase().includes(exp.toLowerCase())
-        )
-      );
-    }
-
-    // Apply industry filters
-    if (filters.industry.length > 0) {
-      result = result.filter((job) => 
-        filters.industry.some(ind => 
-          job.industry && job.industry.toLowerCase().includes(ind.toLowerCase())
-        )
-      );
-    }
-    
-    setFilteredJobs(result);
-  };
-
-  const toggleFilter = (category, value) => {
-    setFilters(prevFilters => {
-      const updated = { ...prevFilters };
       
-      if (updated[category].includes(value)) {
-        // Remove the filter if already applied
-        updated[category] = updated[category].filter(v => v !== value);
-      } else {
-        // Add the filter
-        updated[category] = [...updated[category], value];
-      }
-      
-      return updated;
-    });
+      // Show error message
+      setApiStatus({
+        show: true,
+        message: 'Error connecting to job search API. Showing fallback results instead.',
+        type: 'error'
+      });
+    }
   };
 
-  const removeFilter = (category, value) => {
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      [category]: prevFilters[category].filter(v => v !== value)
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      location: [],
-      type: [],
-      experience: [],
-      industry: []
-    });
+  const handleClearFilters = () => {
     setSearchQuery('');
+    setLocationQuery('Bangalore');
+    
+    // Reset active filters
+    setActiveFilters([]);
+    
+    // Load jobs with cleared filters
+    setSearchParams({
+      search: '',
+      location: 'Bangalore'
+    });
+    
+    // Reload jobs
+    loadJobs();
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    loadJobs(); // Reload jobs with the new search query
+    loadJobs(); // Trigger API search with current filters
   };
 
-  const handleRefresh = () => {
-    loadJobs();
-  };
-
-  const toggleApiTester = () => {
-    setShowApiTester(!showApiTester);
-  };
-
-  const renderFilterCategory = (category, title) => {
-    return (
-      <div className="filter-category">
-        <h3 className="filter-title">{title}</h3>
-        <div className="filter-options">
-          {filterOptions[category].map((option) => (
-            <label key={option} className="filter-option">
-              <input
-                type="checkbox"
-                checked={filters[category].includes(option)}
-                onChange={() => toggleFilter(category, option)}
-              />
-              <span className="filter-option-text">{option}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderFilterSection = () => {
-    if (!filterVisible) return null;
-    
-    return (
-      <div className="filter-section">
-        {renderFilterCategory('location', 'Location')}
-        {renderFilterCategory('type', 'Job Type')}
-        {renderFilterCategory('experience', 'Experience Level')}
-        {renderFilterCategory('industry', 'Industry')}
-        
-        <div className="filter-actions">
-          <button
-            className="secondary-button"
-            onClick={clearFilters}
-          >
-            <i className="fas fa-times"></i> Clear All
-          </button>
-          <button
-            className="primary-button"
-            onClick={() => setFilterVisible(false)}
-          >
-            <i className="fas fa-check"></i> Apply Filters
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderActiveFilters = () => {
-    if (activeFilters.length === 0) return null;
-    
-    return (
-      <div className="active-filters">
-        <div className="active-filters-list">
-          {activeFilters.map(filter => (
-            <div key={filter.id} className="active-filter-tag">
-              <span>{filter.label}</span>
-              <button 
-                className="remove-filter"
-                onClick={() => removeFilter(filter.category, filter.value)}
-              >
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-          ))}
-          {activeFilters.length > 0 && (
-            <button 
-              className="clear-filters-button"
-              onClick={clearFilters}
-            >
-              Clear All
-            </button>
-          )}
-        </div>
-      </div>
-    );
+  const handleRemoveFilter = (category, value) => {
+    if (category === 'location') {
+      setLocationQuery('Bangalore');
+    }
   };
 
   const renderJobCard = (job) => {
@@ -291,12 +149,12 @@ const JobsPage = () => {
           <div className="card-details">
             <div className="card-detail-item">
               <i className="fas fa-map-marker-alt"></i>
-              <span className="card-detail-text">{job.location || 'Location not specified'}</span>
+              <span className="card-detail-text">{job.location || 'Remote'}</span>
             </div>
             
             <div className="card-detail-item">
               <i className="fas fa-briefcase"></i>
-              <span className="card-detail-text">{job.type || 'Job type not specified'}</span>
+              <span className="card-detail-text">{job.type || 'Full-time'}</span>
             </div>
             
             <div className="card-detail-item">
@@ -306,7 +164,7 @@ const JobsPage = () => {
               </span>
             </div>
 
-            {job.experienceLevel && (
+            {job.experienceLevel && job.experienceLevel !== 'Not specified' && (
               <div className="card-detail-item">
                 <i className="fas fa-user-graduate"></i>
                 <span className="card-detail-text">{job.experienceLevel}</span>
@@ -314,7 +172,7 @@ const JobsPage = () => {
             )}
           </div>
           
-          {job.salary && job.salary !== 'Not specified' && job.salary !== 'Salary not specified' && (
+          {job.salary && job.salary !== 'Salary not specified' && (
             <div className="card-salary">
               <i className="fas fa-money-bill-wave"></i> {job.salary}
             </div>
@@ -329,7 +187,7 @@ const JobsPage = () => {
           <p className="card-description">
             {job.description && job.description.length > 200
               ? `${job.description.substring(0, 200)}...`
-              : job.description || 'No description available'}
+              : job.description}
           </p>
         </div>
         
@@ -357,6 +215,57 @@ const JobsPage = () => {
     );
   };
 
+  const renderActiveFilters = () => {
+    if (activeFilters.length === 0) return null;
+    
+    return (
+      <div className="active-filters">
+        <div className="active-filters-list">
+          {activeFilters.map(filter => (
+            <div key={filter.id} className="active-filter-tag">
+              <span>{filter.label}</span>
+              <button 
+                className="remove-filter"
+                onClick={() => handleRemoveFilter(filter.category, filter.value)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+          ))}
+          {activeFilters.length > 0 && (
+            <button 
+              className="clear-filters-button"
+              onClick={handleClearFilters}
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderApiStatus = () => {
+    if (!apiStatus.show) return null;
+    
+    return (
+      <div className={`api-status-banner ${apiStatus.type}`}>
+        <div>
+          {apiStatus.type === 'success' && <i className="fas fa-check-circle"></i>}
+          {apiStatus.type === 'error' && <i className="fas fa-exclamation-circle"></i>}
+          {apiStatus.type === 'info' && <i className="fas fa-info-circle"></i>}
+          <span>{apiStatus.message}</span>
+        </div>
+        <button 
+          className="api-status-close"
+          onClick={() => setApiStatus({ ...apiStatus, show: false })}
+        >
+          <i className="fas fa-times"></i>
+        </button>
+      </div>
+    );
+  };
+
   const renderEmptyState = () => {
     if (loading) {
       return (
@@ -373,21 +282,12 @@ const JobsPage = () => {
           <i className="fas fa-exclamation-circle error-icon"></i>
           <h2 className="error-title">Oops! Something went wrong</h2>
           <p className="error-text">{error}</p>
-          <div className="error-actions">
-            <button 
-              className="primary-button"
-              onClick={handleRefresh}
-            >
-              <i className="fas fa-sync"></i> Try Again
-            </button>
-            
-            <button 
-              className="secondary-button"
-              onClick={toggleApiTester}
-            >
-              <i className="fas fa-wrench"></i> Debug API Connection
-            </button>
-          </div>
+          <button 
+            className="primary-button"
+            onClick={loadJobs}
+          >
+            <i className="fas fa-sync"></i> Try Again
+          </button>
         </div>
       );
     }
@@ -397,18 +297,14 @@ const JobsPage = () => {
         <i className="fas fa-briefcase empty-icon"></i>
         <h2 className="empty-title">No jobs found</h2>
         <p className="empty-text">
-          {searchQuery || Object.values(filters).some(f => f.length > 0)
-            ? "Try adjusting your filters or search query."
-            : "There are no job listings available at the moment. Please check back later."}
+          Try adjusting your filters or search query.
         </p>
-        {(searchQuery || Object.values(filters).some(f => f.length > 0)) && (
-          <button
-            className="primary-button"
-            onClick={clearFilters}
-          >
-            <i className="fas fa-filter"></i> Clear Filters
-          </button>
-        )}
+        <button
+          className="primary-button"
+          onClick={handleClearFilters}
+        >
+          <i className="fas fa-filter"></i> Clear Filters
+        </button>
       </div>
     );
   };
@@ -422,8 +318,7 @@ const JobsPage = () => {
         </p>
       </div>
       
-      {/* API Tester (hidden by default, can be shown when debugging) */}
-      {showApiTester && <ApiTester />}
+      {renderApiStatus()}
       
       <div className="search-filter-container">
         <form onSubmit={handleSearch} className="search-form">
@@ -431,7 +326,7 @@ const JobsPage = () => {
             <input
               type="text"
               className="search-input"
-              placeholder="Search jobs, companies, skills..."
+              placeholder="Search jobs, skills, companies..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -442,58 +337,46 @@ const JobsPage = () => {
         </form>
         
         <div className="filter-buttons">
-          <button
-            className={`filter-toggle-button ${filterVisible ? 'active' : ''}`}
-            onClick={() => setFilterVisible(!filterVisible)}
-          >
-            <i className="fas fa-filter"></i>
-            <span>Filters</span>
-          </button>
+          <div className="location-filter">
+            <input
+              type="text"
+              className="location-input"
+              placeholder="Location (e.g., Bangalore)"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+            />
+          </div>
           <button
             className="refresh-button"
-            onClick={handleRefresh}
+            onClick={loadJobs}
             disabled={loading}
           >
             <i className={`fas fa-sync ${loading ? 'fa-spin' : ''}`}></i>
-            <span>Refresh</span>
+            <span>Search</span>
           </button>
-          
-          {/* Hidden debug button - only show in development */}
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              className="refresh-button"
-              onClick={toggleApiTester}
-              style={{ marginLeft: '8px' }}
-            >
-              <i className="fas fa-wrench"></i>
-              <span>Debug</span>
-            </button>
-          )}
         </div>
       </div>
       
-      {renderFilterSection()}
       {renderActiveFilters()}
       
-      {filteredJobs.length > 0 && !loading && (
+      {jobs.length > 0 && !loading && (
         <div className="results-info">
-          <span>{filteredJobs.length} {filteredJobs.length === 1 ? 'job' : 'jobs'} found</span>
+          <span>{jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} found</span>
           {jobs.length > 0 && (
             <div className="sort-options">
               <label>Sort by: </label>
               <select 
                 className="sort-select"
                 onChange={(e) => {
-                  const sortedJobs = [...filteredJobs];
+                  const sortedJobs = [...jobs];
                   if (e.target.value === 'date') {
                     sortedJobs.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
                   } else if (e.target.value === 'relevance') {
                     // This would be a more complex sorting algorithm in a real app
-                    // For now, we'll just restore the original order
-                    applyFilters();
+                    loadJobs(); // Just reload the original order
                     return;
                   }
-                  setFilteredJobs(sortedJobs);
+                  setJobs(sortedJobs);
                 }}
               >
                 <option value="relevance">Relevance</option>
@@ -505,8 +388,8 @@ const JobsPage = () => {
       )}
       
       <div className="jobs-list">
-        {filteredJobs.length > 0 ? (
-          filteredJobs.map(job => renderJobCard(job))
+        {jobs.length > 0 ? (
+          jobs.map(job => renderJobCard(job))
         ) : (
           renderEmptyState()
         )}
@@ -519,29 +402,24 @@ const JobsPage = () => {
 const formatDate = (dateString) => {
   if (!dateString) return 'Recently';
   
-  try {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else if (diffDays < 30) {
-      return `${Math.floor(diffDays / 7)} weeks ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
-    }
-  } catch (e) {
-    console.error('Error formatting date:', e);
-    return 'Recently';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffTime = Math.abs(now - date);
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) {
+    return 'Today';
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  } else if (diffDays < 30) {
+    return `${Math.floor(diffDays / 7)} weeks ago`;
+  } else {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
   }
 };
 
