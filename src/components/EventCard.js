@@ -3,21 +3,42 @@ import React from 'react';
 
 const EventCard = ({ event }) => {
   const handleRegister = () => {
-    if (event.registrationUrl) {
+    if (event.registrationUrl && event.registrationUrl !== '#') {
       window.open(event.registrationUrl, '_blank');
+    } else {
+      alert('Registration link is not available for this event.');
     }
   };
   
   const formatDate = (dateString) => {
-    if (!dateString) return '';
+    if (!dateString) return 'Date not specified';
     
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      // Try to parse ISO date
+      if (dateString.includes('T')) {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        }
+      }
+      
+      // Handle date ranges or already formatted dates
+      return dateString;
+    } catch (e) {
+      console.warn('Error formatting date:', e);
+      return dateString;
+    }
+  };
+
+  // Fallback image for broken links
+  const handleImageError = (e) => {
+    e.target.onerror = null;
+    e.target.src = `https://picsum.photos/seed/${event.id}/400/200`;
   };
   
   return (
@@ -25,7 +46,7 @@ const EventCard = ({ event }) => {
       <div className="card-header">
         <div className="card-title-container">
           <h3 className="card-title">{event.title}</h3>
-          <div className="card-subtitle">{event.category}</div>
+          <div className="card-subtitle">{event.category || 'Event'}</div>
         </div>
         
         {event.image && (
@@ -33,6 +54,7 @@ const EventCard = ({ event }) => {
             src={event.image}
             alt={event.title}
             className="card-logo"
+            onError={handleImageError}
           />
         )}
       </div>
@@ -68,6 +90,10 @@ const EventCard = ({ event }) => {
                       src={speaker.image} 
                       alt={speaker.name} 
                       className="speaker-image"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                      }}
                     />
                   )}
                   <div className="speaker-info">
@@ -81,9 +107,7 @@ const EventCard = ({ event }) => {
         )}
         
         <p className="card-description">
-          {event.description.length > 200
-            ? `${event.description.substring(0, 200)}...`
-            : event.description}
+          {event.description}
         </p>
       </div>
       
@@ -99,7 +123,7 @@ const EventCard = ({ event }) => {
         </button>
         
         <button className="primary-button" onClick={handleRegister}>
-          Register
+          {event.registrationUrl && event.registrationUrl !== '#' ? 'Register' : 'Learn More'}
         </button>
       </div>
     </div>

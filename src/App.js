@@ -1,6 +1,7 @@
-// App.js - Main application component
+// App.js - Main application component (updated)
 import React, { useState, useEffect, useContext } from 'react';
 import './App.css';
+import './pages/EventsPage.css'; // Import EventsPage styles
 
 // Context Providers
 import { AuthProvider, AuthContext } from './context/AuthContext';
@@ -11,7 +12,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import JobsPage from './pages/JobsPage';
-import EventsPage from './pages/EventsPage';
+import EventsPage from './pages/EventsPage'; // Import the new EventsPage
 import MentorshipPage from './pages/MentorshipPage';
 import SettingsPage from './pages/SettingsPage';
 import ProfilePage from './pages/ProfilePage';
