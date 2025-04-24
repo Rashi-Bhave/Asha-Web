@@ -54,13 +54,24 @@ const MentorshipPage = () => {
           // Get mentors for specific subcategory
           const subcategory = category.subcategories.find(sc => sc.name === activeSubcategory);
           if (subcategory && subcategory.mentors) {
-            mentorsList = subcategory.mentors;
+            // Add category and subcategory information to each mentor
+            mentorsList = subcategory.mentors.map(mentor => ({
+              ...mentor,
+              category: category.name,
+              subcategories: mentor.subcategories || [subcategory.name]
+            }));
           }
         } else {
           // Get all mentors from all subcategories in the category
           category.subcategories.forEach(subcategory => {
             if (subcategory.mentors) {
-              mentorsList = [...mentorsList, ...subcategory.mentors];
+              // Add category and subcategory information to each mentor
+              const mentorsWithCategory = subcategory.mentors.map(mentor => ({
+                ...mentor,
+                category: category.name,
+                subcategories: mentor.subcategories || [subcategory.name]
+              }));
+              mentorsList = [...mentorsList, ...mentorsWithCategory];
             }
           });
         }
@@ -70,7 +81,13 @@ const MentorshipPage = () => {
       categories.forEach(category => {
         category.subcategories.forEach(subcategory => {
           if (subcategory.mentors) {
-            mentorsList = [...mentorsList, ...subcategory.mentors];
+            // Add category and subcategory information to each mentor
+            const mentorsWithCategory = subcategory.mentors.map(mentor => ({
+              ...mentor,
+              category: category.name,
+              subcategories: mentor.subcategories || [subcategory.name]
+            }));
+            mentorsList = [...mentorsList, ...mentorsWithCategory];
           }
         });
       });
@@ -81,7 +98,7 @@ const MentorshipPage = () => {
       const query = searchQuery.toLowerCase();
       mentorsList = mentorsList.filter(mentor => 
         mentor.name.toLowerCase().includes(query) || 
-        mentor.title.toLowerCase().includes(query)
+        (mentor.title && mentor.title.toLowerCase().includes(query))
       );
     }
     
@@ -107,8 +124,6 @@ const MentorshipPage = () => {
     e.preventDefault();
     // Search is already handled by the useEffect
   };
-
-  // We've moved the mentor card rendering to a separate component
 
   const renderCategoryTabs = () => {
     return (
@@ -191,11 +206,9 @@ const MentorshipPage = () => {
             <p>Loading mentors...</p>
           </div>
         ) : filteredMentors.length > 0 ? (
-          <div className="mentors-grid">
-            {filteredMentors.map(mentor => (
-              <MentorCard key={mentor.name} mentor={mentor} />
-            ))}
-          </div>
+          filteredMentors.map(mentor => (
+            <MentorCard key={mentor.name} mentor={mentor} />
+          ))
         ) : (
           <div className="empty-state">
             <i className="fas fa-users empty-icon"></i>
