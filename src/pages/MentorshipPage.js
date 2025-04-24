@@ -1,192 +1,207 @@
-// Placeholder content for MentorshipPage.js
-// pages/MentorshipPage.js
+// src/pages/MentorshipPage.js
 import React, { useState, useEffect } from 'react';
+import mentorsData from '../data/topmate.json';
+import MentorCard from '../components/MentorCard';
+import './MentorshipPage.css';
 
 const MentorshipPage = () => {
-  const [mentorships, setMentorships] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeSubcategory, setActiveSubcategory] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredMentors, setFilteredMentors] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
+  // Initialize data on component mount
   useEffect(() => {
-    const loadMentorships = async () => {
-      try {
-        setLoading(true);
-        // In a real app, fetch from API
-        // For demo, create mock data
-        const mockMentorships = [
-          {
-            id: 1,
-            title: 'Leadership Accelerator Program',
-            mentor: 'Dr. Nandita Sharma',
-            mentorTitle: 'CEO, TechInnovations India',
-            focus: 'Executive Leadership Development',
-            duration: '6 months',
-            format: 'One-on-one sessions + Group workshops',
-            description: 'This program is designed for mid-career women looking to advance into senior leadership positions. It combines personalized coaching with group learning to develop strategic leadership skills, executive presence, and organizational influence.',
-            image: 'https://randomuser.me/api/portraits/women/21.jpg',
-            industry: 'Technology',
-            startDate: '2025-05-15',
-            commitmentHours: '4-6 hours per month',
-            application: 'https://example.com/mentorship/apply/1',
-          },
-          {
-            id: 2,
-            title: 'Tech Career Pathfinder',
-            mentor: 'Ananya Kapoor',
-            mentorTitle: 'Senior Engineering Manager, GlobalSoft',
-            focus: 'Technical Career Advancement',
-            duration: '4 months',
-            format: 'Bi-weekly one-on-one sessions',
-            description: 'Designed for women in technical roles looking to grow their careers in engineering, data science, or product development. This mentorship program provides guidance on technical skill development, career planning, and navigating challenges in tech-focused roles.',
-            image: 'https://randomuser.me/api/portraits/women/23.jpg',
-            industry: 'Software & Technology',
-            startDate: '2025-06-01',
-            commitmentHours: '2-3 hours per month',
-            application: 'https://example.com/mentorship/apply/2',
-          },
-          {
-            id: 3,
-            title: 'Entrepreneurship Launchpad',
-            mentor: 'Ritu Malhotra',
-            mentorTitle: 'Founder & CEO, GrowthVentures',
-            focus: 'Business Development & Entrepreneurship',
-            duration: '6 months',
-            format: 'Monthly one-on-one + Peer group sessions',
-            description: 'For women entrepreneurs at any stage of their business journey. This program provides guidance on business planning, funding strategies, operations, marketing, and leadership challenges specific to startup founders and small business owners.',
-            image: 'https://randomuser.me/api/portraits/women/25.jpg',
-            industry: 'Entrepreneurship',
-            startDate: '2025-05-10',
-            commitmentHours: '4-5 hours per month',
-            application: 'https://example.com/mentorship/apply/3',
-          }
-        ];
+    if (mentorsData && mentorsData.categories) {
+      setCategories(mentorsData.categories);
+      
+      // Set default active category to first one with mentors
+      const firstCategoryWithMentors = mentorsData.categories.find(category => 
+        category.subcategories.some(subcategory => subcategory.mentors && subcategory.mentors.length > 0)
+      );
+      
+      if (firstCategoryWithMentors) {
+        setActiveCategory(firstCategoryWithMentors.name);
         
-        setMentorships(mockMentorships);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading mentorships:', error);
-        setLoading(false);
+        // Set default active subcategory to first one with mentors
+        const firstSubcategoryWithMentors = firstCategoryWithMentors.subcategories.find(
+          subcategory => subcategory.mentors && subcategory.mentors.length > 0
+        );
+        
+        if (firstSubcategoryWithMentors) {
+          setActiveSubcategory(firstSubcategoryWithMentors.name);
+        }
       }
-    };
-    
-    loadMentorships();
+      
+      setLoading(false);
+    }
   }, []);
-  
-  const renderMentorshipCard = (mentorship) => {
+
+  // Filter mentors when category, subcategory or search query changes
+  useEffect(() => {
+    if (!categories.length) return;
+    
+    let mentorsList = [];
+    
+    // Find all mentors for the active category and subcategory
+    if (activeCategory) {
+      const category = categories.find(c => c.name === activeCategory);
+      
+      if (category) {
+        if (activeSubcategory) {
+          // Get mentors for specific subcategory
+          const subcategory = category.subcategories.find(sc => sc.name === activeSubcategory);
+          if (subcategory && subcategory.mentors) {
+            mentorsList = subcategory.mentors;
+          }
+        } else {
+          // Get all mentors from all subcategories in the category
+          category.subcategories.forEach(subcategory => {
+            if (subcategory.mentors) {
+              mentorsList = [...mentorsList, ...subcategory.mentors];
+            }
+          });
+        }
+      }
+    } else {
+      // No category selected, get all mentors
+      categories.forEach(category => {
+        category.subcategories.forEach(subcategory => {
+          if (subcategory.mentors) {
+            mentorsList = [...mentorsList, ...subcategory.mentors];
+          }
+        });
+      });
+    }
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      mentorsList = mentorsList.filter(mentor => 
+        mentor.name.toLowerCase().includes(query) || 
+        mentor.title.toLowerCase().includes(query)
+      );
+    }
+    
+    setFilteredMentors(mentorsList);
+  }, [categories, activeCategory, activeSubcategory, searchQuery]);
+
+  const handleCategoryChange = (categoryName) => {
+    if (activeCategory === categoryName) {
+      // Deselect if clicking the active category
+      setActiveCategory(null);
+      setActiveSubcategory(null);
+    } else {
+      setActiveCategory(categoryName);
+      setActiveSubcategory(null); // Reset subcategory when changing category
+    }
+  };
+
+  const handleSubcategoryChange = (subcategoryName) => {
+    setActiveSubcategory(subcategoryName);
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    // Search is already handled by the useEffect
+  };
+
+  // We've moved the mentor card rendering to a separate component
+
+  const renderCategoryTabs = () => {
     return (
-      <div key={mentorship.id} className="card">
-        <div className="card-header">
-          <div className="card-title-container">
-            <h3 className="card-title">{mentorship.title}</h3>
-            <div className="card-subtitle">Led by {mentorship.mentor}</div>
-          </div>
-          
-          {mentorship.image && (
-            <img
-              src={mentorship.image}
-              alt={mentorship.mentor}
-              className="card-logo mentor-image"
-            />
-          )}
-        </div>
-        
-        <div className="card-content">
-          <div className="card-details">
-            <div className="card-detail-item">
-              <i className="fas fa-briefcase"></i>
-              <span className="card-detail-text">{mentorship.focus}</span>
-            </div>
-            
-            <div className="card-detail-item">
-              <i className="fas fa-clock"></i>
-              <span className="card-detail-text">{mentorship.duration}</span>
-            </div>
-            
-            <div className="card-detail-item">
-              <i className="fas fa-industry"></i>
-              <span className="card-detail-text">{mentorship.industry}</span>
-            </div>
-          </div>
-          
-          <div className="card-detail-item">
-            <i className="fas fa-calendar-alt"></i>
-            <span className="card-detail-text">Starts {formatDate(mentorship.startDate)}</span>
-          </div>
-          
-          <div className="card-detail-item">
-            <i className="fas fa-user-clock"></i>
-            <span className="card-detail-text">Commitment: {mentorship.commitmentHours}</span>
-          </div>
-          
-          <div className="card-detail-item">
-            <i className="fas fa-users"></i>
-            <span className="card-detail-text">Format: {mentorship.format}</span>
-          </div>
-          
-          <p className="card-description">
-            {mentorship.description}
-          </p>
-        </div>
-        
-        <div className="card-actions">
-          <button className="action-button">
-            <i className="far fa-bookmark"></i>
-            <span>Save</span>
-          </button>
-          
-          <button className="action-button">
-            <i className="fas fa-share"></i>
-            <span>Share</span>
-          </button>
-          
-          <a 
-            href={mentorship.application} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="primary-button"
+      <div className="category-tabs">
+        {categories.map((category) => (
+          <button
+            key={category.name}
+            className={`category-tab ${activeCategory === category.name ? 'active' : ''}`}
+            onClick={() => handleCategoryChange(category.name)}
           >
-            Apply Now
-          </a>
-        </div>
+            {category.name}
+          </button>
+        ))}
       </div>
     );
   };
-  
+
+  const renderSubcategoryTabs = () => {
+    if (!activeCategory) return null;
+    
+    const category = categories.find(c => c.name === activeCategory);
+    if (!category) return null;
+    
+    return (
+      <div className="subcategory-tabs">
+        {category.subcategories.map((subcategory) => (
+          <button
+            key={subcategory.name}
+            className={`subcategory-tab ${activeSubcategory === subcategory.name ? 'active' : ''}`}
+            onClick={() => handleSubcategoryChange(subcategory.name)}
+            disabled={!subcategory.mentors || subcategory.mentors.length === 0}
+          >
+            {subcategory.name} 
+            {subcategory.mentors && <span className="count">({subcategory.mentors.length})</span>}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="mentorship-page">
       <div className="page-header">
-        <h1 className="page-title">Mentorship Programs</h1>
+        <h1 className="page-title">Find Your Mentor</h1>
         <p className="page-description">
           Connect with experienced mentors who can guide your professional journey
         </p>
       </div>
       
       <div className="search-filter-container">
-        <div className="search-container">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search mentors, programs, skills..."
-          />
-          <button className="search-button">
-            <i className="fas fa-search"></i>
-          </button>
-        </div>
+        <form onSubmit={handleSearch} className="search-form">
+          <div className="search-container">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search mentors by name, expertise, or title..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="search-button">
+              <i className="fas fa-search"></i>
+            </button>
+          </div>
+        </form>
       </div>
       
-      <div className="mentorship-list">
+      {renderCategoryTabs()}
+      {renderSubcategoryTabs()}
+      
+      <div className="results-info">
+        {filteredMentors.length > 0 && (
+          <span>Found {filteredMentors.length} mentors</span>
+        )}
+      </div>
+      
+      <div className="mentors-grid">
         {loading ? (
           <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading mentorship programs...</p>
+            <div className="loader"></div>
+            <p>Loading mentors...</p>
           </div>
-        ) : mentorships.length > 0 ? (
-          mentorships.map(mentorship => renderMentorshipCard(mentorship))
+        ) : filteredMentors.length > 0 ? (
+          <div className="mentors-grid">
+            {filteredMentors.map(mentor => (
+              <MentorCard key={mentor.name} mentor={mentor} />
+            ))}
+          </div>
         ) : (
           <div className="empty-state">
             <i className="fas fa-users empty-icon"></i>
-            <h2 className="empty-title">No mentorship programs found</h2>
+            <h2 className="empty-title">No mentors found</h2>
             <p className="empty-text">
-              There are no mentorship programs available at the moment. Please check back later.
+              Try adjusting your filters or search query.
             </p>
           </div>
         )}
@@ -195,18 +210,4 @@ const MentorshipPage = () => {
   );
 };
 
-// Utility function to format dates
-const formatDate = (dateString) => {
-  if (!dateString) return 'Soon';
-  
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  });
-};
-
 export default MentorshipPage;
-
-// pages/SettingsPage.js
